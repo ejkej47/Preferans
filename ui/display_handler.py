@@ -556,70 +556,96 @@ class DisplayHandler:
     def nacrtaj_kolonu_stihova(self, screen, stihovi, x, y):
         for stih in stihovi:
             self.nacrtaj_jedan_stih(screen, stih, x, y)
-            y += 67
-
+            # Smanjen razmak između redova da bi svih 5 štihova stalo bez overflow-a
+            y += 66 
 
     def nacrtaj_jedan_stih(self, screen, stih, x, y):
         rh = self.gui.round_history
 
-        rect = pygame.Rect(x, y, 430, 58)
-        pygame.draw.rect(screen, (245, 245, 245), rect, border_radius=4)
-        pygame.draw.rect(screen, CRNA, rect, 1, border_radius=4)
+        BOX_W = 435  # Smanjena širina da ne udara u ivice i ne ispada iz overlay-a
+        BOX_H = 58   # Smanjena visina celog reda da ne ispada dole
+        INDEX_W = 65 # Uži levi prostor za tekst "Štih X" da bi desno ostalo više mesta
+
+        rect = pygame.Rect(x, y, BOX_W, BOX_H)
+        pygame.draw.rect(screen, (252, 252, 252), rect, border_radius=8)
+        pygame.draw.rect(screen, CRNA, rect, 1, border_radius=8)
 
         pobednik = stih["pobednik"]
 
+        # --- LEVI DEO: Indeks štiha ---
         naslov = f"Štih {stih['broj']}"
-        txt_naslov = FONT_BOLD.render(naslov, True, CRNA)
-        screen.blit(txt_naslov, (x + 8, y + 5))
+        txt_naslov = FONT_BOLD.render(naslov, True, (40, 40, 40))
+        nx = x + (INDEX_W - txt_naslov.get_width()) // 2
+        ny = y + (BOX_H - txt_naslov.get_height()) // 2
+        screen.blit(txt_naslov, (nx, ny))
 
-        # Rečnici za pretvaranje teksta u simbole i boje
-        znak_mapa = {'Pik': '♠', 'Karo': '♦', 'Herc': '♥', 'Tref': '♣'}
-        boja_znaka = {'Pik': CRNA, 'Karo': (220, 0, 0), 'Herc': (220, 0, 0), 'Tref': CRNA}
+        # Vertikalni separator
+        pygame.draw.line(screen, (210, 210, 210), (x + INDEX_W, y + 8), (x + INDEX_W, y + BOX_H - 8), 1)
 
-        start_x = x + 8
-        box_y = y + 27
-        box_h = 24
+        # --- DESNI DEO: Karte i strelice ---
+        startX = x + INDEX_W + 8
+        trenutni_x = startX
+        ukupno = len(stih["karte"])
+        razmak_izmedju = 15 # Manji razmak za strelicu kako bi blokovi karata bili veći
 
         for idx, (pid, karta) in enumerate(stih["karte"]):
-            v, b = karta.split()
-            simbol = znak_mapa.get(b, b)
-            boja = boja_znaka.get(b, CRNA)
+            ime = rh.kratko_ime(pid)
+            if ime == "Ja": ime_txt = "Ja"
+            elif ime == "D": ime_txt = "Desni"
+            elif ime == "L": ime_txt = "Levi"
+            else: ime_txt = ime
+
+            delovi = karta.split()
+            v = delovi[0]
+            b = delovi[1] if len(delovi) > 1 else ""
+
+            simboli = {'Pik': '♠', 'Karo': '♦', 'Herc': '♥', 'Tref': '♣'}
+            boje = {'Pik': CRNA, 'Tref': CRNA, 'Karo': (220, 0, 0), 'Herc': (220, 0, 0)}
             
-            je_pobednik = (pid == pobednik)
-            ime_txt = rh.ime(pid)
+            simbol = simboli.get(b, b)
+            boja_znaka = boje.get(b, CRNA)
+
+            # Svi bitni elementi idu u krupnijem fontu da maksimalno iskoriste prostor
+            txt_i = FONT_BOLD.render(f"{ime_txt} ", True, (80, 80, 80))
+            txt_v = FONT_BIG.render(v, True, CRNA)
+            txt_b = FONT_BIG.render(simbol, True, boja_znaka)
+
+            # Minimalan padding da karte deluju masivno i izraženo
+            pad_x = 4 
+            w_bloka = txt_i.get_width() + txt_v.get_width() + txt_b.get_width() + pad_x * 2
+            # Povećana visina bloka (skoro do gornje i donje ivice samog štih-boxa)
+            h_bloka = 46 
+            y_bloka = y + (BOX_H - h_bloka) // 2
+
+            rect_bloka = pygame.Rect(trenutni_x, y_bloka, w_bloka, h_bloka)
+
+            if pid == pobednik:
+                pygame.draw.rect(screen, (230, 255, 230), rect_bloka, border_radius=6)
+                pygame.draw.rect(screen, (0, 160, 0), rect_bloka, 3, border_radius=6) # Deblji uočljivi zeleni okvir
+            else:
+                pygame.draw.rect(screen, BELA, rect_bloka, border_radius=6)
+                pygame.draw.rect(screen, (150, 150, 150), rect_bloka, 1, border_radius=6)
+
+            # Centriranje samog teksta unutar popunjenog bloka
+            unutar_x = trenutni_x + pad_x
+            cy = y_bloka + h_bloka // 2
+
+            screen.blit(txt_i, (unutar_x, cy - txt_i.get_height() // 2))
+            unutar_x += txt_i.get_width()
             
-            # Priprema teksta
-            ime_surf = FONT_SMALL.render(f"{ime_txt}  {v}", True, CRNA)
-            simbol_surf = FONT_SMALL.render(simbol, True, boja)
+            screen.blit(txt_v, (unutar_x, cy - txt_v.get_height() // 2))
+            unutar_x += txt_v.get_width()
             
-            # Računanje širine malog okvira (box-a)
-            box_w = ime_surf.get_width() + simbol_surf.get_width() + 10
-    
-            # Crtanje box-a za tog igrača
-            box_rect = pygame.Rect(start_x, box_y, box_w, box_h)
-            boja_pozadine = (220, 240, 220) if je_pobednik else BELA
-            boja_okvira = (0, 150, 0) if je_pobednik else (150, 150, 150)
-            
-            pygame.draw.rect(screen, boja_pozadine, box_rect, border_radius=3)
-            pygame.draw.rect(screen, boja_okvira, box_rect, 1, border_radius=3)
-            
-            # Iscrtavanje unutrašnjosti box-a
-            trenutni_x = start_x + 5
-            tekst_y = box_y + (box_h - ime_surf.get_height()) // 2
-            
-            screen.blit(ime_surf, (trenutni_x, tekst_y))
-            trenutni_x += ime_surf.get_width()
-            
-            screen.blit(simbol_surf, (trenutni_x, tekst_y))
-            trenutni_x += simbol_surf.get_width()
-            
-            start_x += box_w + 10 # Odmaknemo se za crtanje strelice
-            
-            # Crtanje strelice između igrača (samo ako nije poslednji u nizu)
-            if idx < len(stih["karte"]) - 1:
-                strelica_surf = FONT_SMALL.render("→", True, (120, 120, 120))
-                screen.blit(strelica_surf, (start_x, tekst_y))
-                start_x += strelica_surf.get_width() + 10
+            screen.blit(txt_b, (unutar_x, cy - txt_b.get_height() // 2))
+
+            trenutni_x += w_bloka
+
+            if idx < ukupno - 1:
+                str_txt = FONT_BOLD.render("→", True, (170, 170, 170))
+                sx = trenutni_x + (razmak_izmedju - str_txt.get_width()) // 2
+                sy = y + (BOX_H - str_txt.get_height()) // 2
+                screen.blit(str_txt, (sx, sy))
+                trenutni_x += razmak_izmedju
 
 
     def skrati_tekst(self, tekst, max_len):

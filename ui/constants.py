@@ -15,3 +15,4 @@ SCREEN_H = 700
 FONT_SMALL = pygame.font.SysFont("Arial", 14)
 FONT_BOLD = pygame.font.SysFont("Arial", 16, bold=True)
 FONT_MSG = pygame.font.SysFont("Arial", 20, bold=True)
+FONT_BIG = pygame.font.SysFont("Arial", 26, bold=True)
